@@ -72,7 +72,12 @@ params = {'latent_features': latent_features,
             'conv_padding': conv_padding,
             'lin_layer': lin_layer,
             'num_classes': num_classes,
-            'batchnorm_momentum': batchnorm_momentum}
+            'batchnorm_momentum': batchnorm_momentum,
+            'num_conv': num_conv,
+            'num_lin': num_lin,
+            'num_aux': num_conv,
+            'num_class': num_class,
+            'num_aux_decoder': num_aux_decoder}
     
 
 '''
@@ -89,7 +94,14 @@ class CNN_VAE(nn.Module):
         ## Networks
         self.layer_size = get_layer_sizes(params['img_dimension'], params['conv_out_channels'], 
                                           params['conv_kernel'], params['conv_padding'], params['conv_stride'])
-        self.encoder = Encoder()
+        
+        
+        self.encoder = Encoder(height=params['height'], width=params['width'], conv_out_channels=params['conv_out_channels'], 
+                 num_conv=params['num_conv'], input_channels=params['input_channels'], conv_kernel=params['conv_kernel'], 
+                 conv_stride=params['conv_stride'], conv_padding=params['conv_padding'], batchnorm_momentum=params['batchnorm_momentum'], 
+                 pool_kernel=params['pool_kernel'], pool_stride=params['pool_stride'], pool_padding=params['pool_padding'], 
+                 num_conv=params['num_conv'], num_lin=params['num_lin'], lin_layer=params['lin_layer'], 
+                 do_p_lin=params['do_p_lin'], use_dropout=params['use_dropout'])
         self.decoder = Decoder(self.layer_size)
         self.classifier = Classifier()
         self.aux_encoder = Aux_encoder()
@@ -239,9 +251,9 @@ class CNN_VAE(nn.Module):
 Encoders
 '''
 class Encoder(nn.Module): 
-    def __init__(self, height, width, conv_out_channels, num_conv, input_channels, conv_kernel, conv_stride,
-                 conv_padding, batchnorm_momentum, pool_kernel, pool_stride, pool_padding, num_conv, num_lin,
-                 lin_layer, do_p_lin, use_dropout):
+    def __init__(self, height=None, width=None, conv_out_channels=None, num_conv=None, input_channels=None, 
+                 conv_kernel=None, conv_stride=None, conv_padding=None, batchnorm_momentum=None, pool_kernel=None, pool_stride=None, 
+                 pool_padding=None, num_conv=None, num_lin=None, lin_layer=None, do_p_lin=None, use_dropout=False):
         super(Encoder, self).__init__()
         
         # Dropout params
