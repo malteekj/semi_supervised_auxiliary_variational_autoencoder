@@ -24,7 +24,7 @@ from sklearn.decomposition import PCA
 # Custom functions
 from dataFunctions import RSNADataset, collate_fn_balanced_batch
 from network import CNN_VAE
-from lossFunctions import Gaussian_density, kl_a_calc, ELBO_loss, normalize_2, balanced_accuracy, balanced_binary_cross_entropy, balanced_accuracy_test
+from lossFunctions import Gaussian_density, kl_a_calc, ELBO_loss, normalize, balanced_accuracy, balanced_binary_cross_entropy, balanced_accuracy_test
 #%%
 '''
 ### Work log ###
@@ -44,13 +44,11 @@ Completed tasks:
 Load data (Done)
 '''
 # Dataloader settings
-num_classes = 2
+'''
 num_samples_unlabelled = 10
 num_samples_labelled = 10
 num_samples_test = 10
-img_dimension = [122, 122]
-batch_size = 2
-
+'''
 root_data = r'C:\Users\Malte\Documents\DTU\7. semester\Deep learning\code_v2.0\rsna-pneumonia-detection-challenge'
 
 # Load data with dataloader
@@ -72,7 +70,34 @@ testloader = DataLoader(testDataset, batch_size=batch_size//2, collate_fn=collat
 '''
 Define the global parameters of the network.
 '''
-
+img_dimension = [122, 122]
+params = {'latent_features': latent_features,
+            'num_samples': num_samples,
+            'img_dimension': img_dimension,
+            'aux_variables': aux_variables,
+            'use_dropout': use_dropout,
+            'do_p_lin': do_p_lin,
+            'do_p_conv': do_p_conv,
+            'batch_size': batch_size,
+            'conv_out_channels': conv_out_channels,
+            'conv_kernel': conv_kernel,
+            'conv_padding': conv_padding,
+            'lin_layer': lin_layer,
+            'num_classes': num_classes,
+            'batchnorm_momentum': batchnorm_momentum,
+            'num_conv': num_conv,
+            'num_lin': num_lin,
+            'num_aux': num_aux,
+            'num_class': num_class,
+            'num_aux_decoder': num_aux_decoder,
+            'lin_layer': lin_layer,
+            'aux_layer': aux_layer,
+            'do_p_conv': do_p_conv,
+            'do_p_lin': do_p_lin,
+            'height': height,
+            'width': width,
+            'channels': channels,
+            'conv_stride': conv_stride}
 
 #%%
 '''
@@ -81,6 +106,7 @@ Define the network and optimizer
 # num_samples is the number of samples drawn from the 
 num_samples = 5
 latent_features = 128
+batch_size = 2
 learning_rate = 1e-4
 
 net = CNN_VAE(latent_features, num_samples)
@@ -135,6 +161,9 @@ print('Class. loss: ',classification_loss)
 print('Likelihood:  ',likelihood_l)
 
 #%%
+num_samples_labelled = 10
+num_samples_unlabelled = 10
+
 
 # Deleting variable Image and reload package Image
 # get_ipython().run_line_magic('reset_selective', '-f "^Image$"')
@@ -442,27 +471,29 @@ for epoch in range(num_epochs):
         epsilon = torch.randn(batch_size, latent_features).to(device)
         samples = torch.sigmoid(net.sample_from_latent(epsilon)).cpu().detach().numpy()
 
-    canvas = np.zeros((params['height']*rows, columns*IMG_SIZE))
+    canvas = np.zeros((img_dimension[0]*rows, img_dimension[1]*columns))
     for i in range(rows):
         for j in range(columns):
             idx = i % columns + rows * j
             #temp_img = samples[idx].reshape((224, 224))
             #canvas[i*28:(i+1)*28, j*28:(j+1)*28] = resize(temp_img, output_shape=[28,28], mode='reflect', anti_aliasing=True)
-            canvas[i*IMG_SIZE:(i+1)*IMG_SIZE, j*IMG_SIZE:(j+1)*IMG_SIZE] = samples[idx,0:IMG_SIZE**2].reshape((IMG_SIZE, IMG_SIZE))
+            canvas[i*img_dimension[0]:(i+1)*img_dimension[0], j*img_dimension[1]:(j+1)*img_dimension[1]] = \
+                samples[idx,0:img_dimension[0]*img_dimension[1]].reshape(img_dimension)
     ax.imshow(canvas, cmap='gray')
 
-    # Inputs
+    # Input images
     ax = axarr[2, 0]
     ax.set_title('Inputs')
     ax.axis('off')
 
-    canvas = np.zeros((IMG_SIZE*rows, columns*IMG_SIZE))
+    canvas = np.zeros((img_dimension[0]*rows, img_dimension[1]*columns))
     for i in range(rows):
         for j in range(columns):
             idx = i % columns + rows * j
             #temp_img = x[idx].reshape((224, 224))
             #canvas[i*28:(i+1)*28, j*28:(j+1)*28] = resize(temp_img, output_shape=[28,28], mode='reflect', anti_aliasing=True)
-            canvas[i*IMG_SIZE:(i+1)*IMG_SIZE, j*IMG_SIZE:(j+1)*IMG_SIZE] = x[idx,0:IMG_SIZE**2].reshape((IMG_SIZE, IMG_SIZE))
+            canvas[i*img_dimension[0]:(i+1)*img_dimension[0], j*img_dimension[1]:(j+1)*img_dimension[1]] = \
+                x[idx,0:img_dimension[0]*img_dimension[1]].reshape(img_dimension)
     ax.imshow(canvas, cmap='gray')
 
     # Reconstructions
@@ -470,35 +501,26 @@ for epoch in range(num_epochs):
     ax.set_title('Reconstructions: mean')
     ax.axis('off')
 
-    canvas = np.zeros((IMG_SIZE*rows, columns*IMG_SIZE))
+    canvas = np.zeros((img_dimension[0]*rows, img_dimension[1]*columns))
     for i in range(rows):
         for j in range(columns):
             idx = i % columns + rows * j
-            #temp_img = x_hat[idx].reshape((224, 224))
-            #canvas[i*28:(i+1)*28, j*28:(j+1)*28] = resize(temp_img, output_shape=[28,28], mode='reflect', anti_aliasing=True)
-            canvas[i*IMG_SIZE:(i+1)*IMG_SIZE, j*IMG_SIZE:(j+1)*IMG_SIZE] = normalize_2(x_hat[idx,0:IMG_SIZE**2].reshape((IMG_SIZE, IMG_SIZE)))
+            canvas[i*img_dimension[0]:(i+1)*img_dimension[0], j*img_dimension[1]:(j+1)*img_dimension[1]] = \
+                normalize(x_hat[idx,0:img_dimension[0]*img_dimension[1]].reshape(img_dimension))
     ax.imshow(canvas, cmap='gray')
 
-    # Reconstructions
+    
+    # Latent features
     ax = axarr[3, 0]
     ax.axis('off')
-    #ax.set_title('Reconstructions: sigma')
-    #sigma = (torch.exp(outputs["x_log_var"]/2)).detach().to("cpu").numpy()
-    #canvas = np.zeros((IMG_SIZE*rows, columns*IMG_SIZE))
-    #for i in range(rows):
-    #    for j in range(columns):
-    #        idx = i % columns + rows * j
-    #        #temp_img = x_hat[idx].reshape((224, 224))
-    #        #canvas[i*28:(i+1)*28, j*28:(j+1)*28] = resize(temp_img, output_shape=[28,28], mode='reflect', anti_aliasing=True)
-    #        canvas[i*IMG_SIZE:(i+1)*IMG_SIZE, j*IMG_SIZE:(j+1)*IMG_SIZE] = sigma[idx,0:IMG_SIZE**2].reshape((IMG_SIZE, IMG_SIZE))
-    #ax.imshow(canvas, cmap='gray')
     ax.set_title('Displaying latent features')
     with torch.no_grad():
         latent_feature = torch.zeros(batch_size,latent_features).to(device)
         for i in range(0,latent_features if latent_features<= batch_size else batch_size):
             latent_feature[i,i] = 100
         displaying_latent_features = (net.sample_from_latent(latent_feature)).cpu().detach() #no sigmoid, instead normalize later
-        
+    
+    # Determine number of rows and columns based on the size of latent space
     if displaying_latent_features.shape[0] == 64: 
         rows_2 = 8
         columns_2 = 8
@@ -508,11 +530,12 @@ for epoch in range(num_epochs):
     else:
         rows_2 = rows
         columns_2 = columns   
-    canvas = np.zeros((IMG_SIZE*rows_2, columns_2*IMG_SIZE))  
+    canvas = np.zeros((img_dimension[0]*rows_2, img_dimension[1]*columns_2))  
     for i in range(rows_2):
         for j in range(columns_2):
             idx = i % columns_2 + rows_2 * j
-            canvas[i*IMG_SIZE:(i+1)*IMG_SIZE, j*IMG_SIZE:(j+1)*IMG_SIZE] = normalize_2(displaying_latent_features[idx,0:IMG_SIZE**2].reshape((IMG_SIZE, IMG_SIZE)))
+            canvas[i*img_dimension[0]:(i+1)*img_dimension[0], j*img_dimension[1]:(j+1)*img_dimension[1]] = \
+                normalize(displaying_latent_features[idx,0:img_dimension[0]*img_dimension[1]].reshape(img_dimension))
     ax.imshow(canvas, cmap='gray')
     
                 
