@@ -112,6 +112,8 @@ elbo_u, elbo_H, elbo_L, kl_u, likelihood_u, kl_u_x, kl_u_a= loss_function(u,outp
 outputs = net(x,y_hot)
 elbo_l, kl, likelihood_l, kl_l_x, kl_l_a= loss_function(x,outputs,y_hot)
 
+
+# Print dimensions of output 
 x_hat = outputs["x_hat"]
 mu, log_var = outputs["mu"], outputs["log_var"]
 mu_img, log_var_img = outputs["x_mean"], outputs["x_log_var"]
