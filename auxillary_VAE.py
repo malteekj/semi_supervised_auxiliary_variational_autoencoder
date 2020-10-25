@@ -442,7 +442,7 @@ for epoch in range(num_epochs):
         epsilon = torch.randn(batch_size, latent_features).to(device)
         samples = torch.sigmoid(net.sample_from_latent(epsilon)).cpu().detach().numpy()
 
-    canvas = np.zeros((IMG_SIZE*rows, columns*IMG_SIZE))
+    canvas = np.zeros((params['height']*rows, columns*IMG_SIZE))
     for i in range(rows):
         for j in range(columns):
             idx = i % columns + rows * j
