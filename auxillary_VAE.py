@@ -68,6 +68,11 @@ testDataset = RSNADataset(num_samples=num_samples_test, num_samples_U=num_sample
 trainloader_labelled = DataLoader(trainDataset_labelled, batch_size=batch_size//2, collate_fn=collate_fn_balanced_batch)
 trainloader_unlabelled = DataLoader(trainDataset_unlabelled, batch_size=batch_size//2, collate_fn=collate_fn_balanced_batch)
 testloader = DataLoader(testDataset, batch_size=batch_size//2, collate_fn=collate_fn_balanced_batch)
+#%% 
+'''
+Define the global parameters of the network.
+'''
+
 
 #%%
 '''
@@ -203,7 +208,7 @@ for epoch in range(num_epochs):
 
         #### Unlabelled
         outputs = net(u)
-        elbo_u, elbo_H, elbo_L, kl_u, likelihood_u, kl_u_x, kl_u_a = loss_function(u, outputs, None,kl_warmup)
+        elbo_u, elbo_H, elbo_L, kl_u, likelihood_u, kl_u_x, kl_u_a = loss_function(params, u, outputs, None,kl_warmup)
         elbo_H = elbo_H.cpu().detach().numpy()
         elbo_L = elbo_L.cpu().detach().numpy()
         kl_u_x = kl_u_x.cpu().detach().numpy()
@@ -311,7 +316,7 @@ for epoch in range(num_epochs):
         #classification_loss = alpha*torch.nn.functional.binary_cross_entropy(logits,y_hot, weight=classWeight)
         #classification_loss = torch.sum(torch.abs(y_hot - logits))
         #classification_loss = alpha*torch.nn.functional.binary_cross_entropy(logits,y_hot)
-        classification_loss = alpha * balanced_binary_cross_entropy( logits, y_hot)
+        classification_loss = alpha * balanced_binary_cross_entropy(params, logits, y_hot)
         # elbo, kl = loss_function(x_hat, x, mu, log_var)
         elbo_l, kl_l, likelihood_l, kl_l_x, kl_l_a = loss_function(x, outputs, kl_warmup)
         kl_l_x = kl_l_x.cpu().detach().numpy()
