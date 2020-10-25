@@ -8,6 +8,13 @@ import torch.nn as nn
 from torch.autograd import Variable
 cuda = torch.cuda.is_available()
 
+# img_dimension = [122, 122]
+# batch_size = 2
+
+
+# num_samples = 5
+# latent_features = 128
+# learning_rate = 1e-4
 
 # # Define size variables
 # print_shapes = False
@@ -21,7 +28,7 @@ cuda = torch.cuda.is_available()
 
 # # Regulization
 # L2_reg = 1e-6
-# DROPOUT = True
+# use_dropout = True
 # do_p_conv = 0.05 # do_p for conv 
 # do_p_lin = 0.1 # do_p for linear 
 # batchnorm_eps = 1e-5
@@ -59,11 +66,12 @@ cuda = torch.cuda.is_available()
 # num_class = len(classifier_layer)
 # num_aux_decoder = len(aux_decoder_layers)
 
+
 params = {'latent_features': latent_features,
             'num_samples': num_samples,
             'img_dimension': img_dimension,
             'aux_variables': aux_variables,
-            'use_dropout', use_dropout,
+            'use_dropout': use_dropout,
             'do_p_lin': do_p_lin,
             'do_p_conv': do_p_conv,
             'batch_size': batch_size,
@@ -75,9 +83,18 @@ params = {'latent_features': latent_features,
             'batchnorm_momentum': batchnorm_momentum,
             'num_conv': num_conv,
             'num_lin': num_lin,
-            'num_aux': num_conv,
+            'num_aux': num_aux,
             'num_class': num_class,
-            'num_aux_decoder': num_aux_decoder}
+            'num_aux_decoder': num_aux_decoder,
+            'lin_layer': lin_layer,
+            'aux_layer': aux_layer,
+            'do_p_conv': do_p_conv,
+            'do_p_lin': do_p_lin,
+            'height': height,
+            'width': width,
+            'channels': channels,
+            'conv_stride': conv_stride}
+
     
 
 '''
@@ -85,7 +102,6 @@ Network
 '''
        
 class CNN_VAE(nn.Module):
-    
     def __init__(self, params):
         super(CNN_VAE, self).__init__(), 
         
@@ -100,8 +116,8 @@ class CNN_VAE(nn.Module):
                  num_conv=params['num_conv'], input_channels=params['input_channels'], conv_kernel=params['conv_kernel'], 
                  conv_stride=params['conv_stride'], conv_padding=params['conv_padding'], batchnorm_momentum=params['batchnorm_momentum'], 
                  pool_kernel=params['pool_kernel'], pool_stride=params['pool_stride'], pool_padding=params['pool_padding'], 
-                 num_conv=params['num_conv'], num_lin=params['num_lin'], lin_layer=params['lin_layer'], 
-                 do_p_lin=params['do_p_lin'], use_dropout=params['use_dropout'])
+                 num_lin=params['num_lin'], lin_layer=params['lin_layer'], do_p_lin=params['do_p_lin'], use_dropout=params['use_dropout'],
+                 batch_size=params['batch_size'])
         self.decoder = Decoder(self.layer_size)
         self.classifier = Classifier()
         self.aux_encoder = Aux_encoder()
@@ -133,7 +149,7 @@ class CNN_VAE(nn.Module):
         if self.aux_variables > 0:
             q_a_mu, q_a_log_var = self.aux_encoder(x)
             q_a = gaussian_sample(q_a_mu,q_a_log_var,self.params['num_samples'],self.params['aux_variables']) # sample auxillary variables
-            xa = torch.cat([x.unsqueeze(1).repeat(1,self.['num_samples',1),q_a],dim=2) # Create combined vector of x and q_a
+            xa = torch.cat([x.unsqueeze(1).repeat(1,self.params['num_samples'],1),q_a],dim=2) # Create combined vector of x and q_a
         else:
             xa = x.unsqueeze(1)
         
@@ -253,12 +269,13 @@ Encoders
 class Encoder(nn.Module): 
     def __init__(self, height=None, width=None, conv_out_channels=None, num_conv=None, input_channels=None, 
                  conv_kernel=None, conv_stride=None, conv_padding=None, batchnorm_momentum=None, pool_kernel=None, pool_stride=None, 
-                 pool_padding=None, num_conv=None, num_lin=None, lin_layer=None, do_p_lin=None, use_dropout=False):
+                 pool_padding=None, num_lin=None, lin_layer=None, do_p_lin=None, use_dropout=False, batch_size=None):
         super(Encoder, self).__init__()
         
         # Dropout params
         self.do_p_lin = do_p_lin
         self.use_dropout = use_dropout
+        self.batch_size = batch_size
         
         # Calculate final size of the CNN
         self.final_dim = compute_final_dimension(height, width, conv_out_channels[-1], num_conv)
@@ -303,7 +320,7 @@ class Encoder(nn.Module):
             if self.use_dropout:
                 x = dropout2d(x, p=self.do_p_conv)   
             x = self.Encoder_conv[i+2](x) # Maxpool Layer
-        x = x.view(batch_size, -1) # Prepare x for linear layers
+        x = x.view(self.batch_size, -1) # Prepare x for linear layers
         
         # Fully connected layers of encoder
         for i in range(0,len(self.Encoder_FC),2): 
@@ -315,17 +332,18 @@ class Encoder(nn.Module):
         return (x)
 
 class Aux_encoder(nn.Module):
-    def __init__(self):
+    def __init__(self, params):
         super(Aux_encoder, self).__init__()
+        self.params = params
         # Auxillary encoder
         Encoder_FC = nn.ModuleList()
-        in_weights = lin_layer[-1]
-        for i in range(NUM_AUX):
-            Encoder_FC.append(Linear(in_features=in_weights, out_features=aux_layer[i]))
-            Encoder_FC.append(BatchNorm1d(aux_layer[i], eps = batchnorm_eps, momentum = batchnorm_momentum))
-            in_weights = aux_layer[i]
-        Encoder_FC.append(Linear(in_features=aux_layer[-1], out_features=aux_variables*2))
-        Encoder_FC.append(BatchNorm1d(aux_variables*2, eps = batchnorm_eps, momentum = batchnorm_momentum))
+        in_weights = params['lin_layer'][-1]
+        for i in range(params['num_aux']):
+            Encoder_FC.append(Linear(in_features=in_weights, out_features=params['aux_layer'][i]))
+            Encoder_FC.append(BatchNorm1d(params['aux_layer'][i]))
+            in_weights = params['aux_layer'][i]
+        Encoder_FC.append(Linear(in_features=params['aux_layer'][-1], out_features=params['aux_variables']*2))
+        Encoder_FC.append(BatchNorm1d(params['aux_variables']*2))
         self.add_module("Encoder_aux", Encoder_FC)
             
     def forward(self,a):
@@ -340,8 +358,8 @@ class Aux_encoder(nn.Module):
             a = self.Encoder_aux[i](a)
             a = self.Encoder_aux[i+1](a)
             a = relu(a)
-            if DROPOUT:
-                a = dropout(a, p=do_p_lin)
+            if self.params['use_dropout']:
+                a = dropout(a, p=params['do_p_lin'])
         q_a_mu, q_a_log_var = torch.chunk(a, 2, dim=-1) # divide to mu and sigma
         return q_a_mu, q_a_log_var
  
@@ -350,37 +368,38 @@ class Aux_encoder(nn.Module):
 Decoders
 '''
 class Decoder(nn.Module):
-    def __init__(self,layer_size):
+    def __init__(self,layer_size, params):
         super(Decoder, self).__init__()
         self.layer_size = layer_size
-        self.final_dim = compute_final_dimension(height,width,conv_out_channels[-1],NUM_CONV)
+        self.final_dim = compute_final_dimension(params['height'],params['width'],
+                                                  params['conv_out_channels'][-1],params['num_conv'])
 
         # Initialize fully connected layers from latent space to convolutional layers
         Decoder_FC = nn.ModuleList()
-        Decoder_FC.append(Linear(in_features=latent_features+num_classes, out_features=lin_layer[-1]))
-        Decoder_FC.append(BatchNorm1d(lin_layer[-1], eps = batchnorm_eps, momentum = batchnorm_momentum))
-        for i in reversed(range(NUM_LIN)):
+        Decoder_FC.append(Linear(in_features=params['latent_features']+params['num_classes'], out_features=params['lin_layer'][-1]))
+        Decoder_FC.append(BatchNorm1d(params['lin_layer'][-1]))
+        for i in reversed(range(params['num_lin'])):
             if i == 0:
                 out_weights = self.final_dim[0]
             else:
-                out_weights = lin_layer[i-1]
-            Decoder_FC.append(Linear(in_features=lin_layer[i], out_features=out_weights))
-            Decoder_FC.append(BatchNorm1d(out_weights, eps = batchnorm_eps, momentum = batchnorm_momentum))
+                out_weights = params['lin_layer'][i-1]
+            Decoder_FC.append(Linear(in_features=params['lin_layer'][i], out_features=out_weights))
+            Decoder_FC.append(BatchNorm1d(out_weights))
         self.add_module("Decoder_FC",Decoder_FC)
         
         # Convolutional layers of the decoder
         Decoder_conv = nn.ModuleList()
-        for i in reversed(range(NUM_CONV)):
+        for i in reversed(range(params['num_conv'])):
             if i == 0:
-                output_channels = channels*2
+                output_channels = params['channels']*2
             else:
-                output_channels = conv_out_channels[i-1] 
-            Decoder_conv.append(ConvTranspose2d(in_channels=conv_out_channels[i],
-                                                out_channels=output_channels,
-                                                kernel_size=conv_kernel[i],
-                                                stride=conv_stride[i],
-                                                padding=conv_padding[i]))
-            Decoder_conv.append(BatchNorm2d(output_channels, eps = batchnorm_eps, momentum = batchnorm_momentum))
+                output_channels = params['conv_out_channels'][i-1] 
+            Decoder_conv.append(ConvTranspose2d(in_channels=params['conv_out_channels'][i],
+                                                out_channels=params['output_channels'],
+                                                kernel_size=params['conv_kernel'][i],
+                                                stride=params['conv_stride'][i],
+                                                padding=params['conv_padding'][i]))
+            Decoder_conv.append(BatchNorm2d(output_channels))
         self.add_module("Decoder_conv",Decoder_conv)
     
     def forward(self,z,y):
@@ -412,7 +431,7 @@ class Decoder(nn.Module):
             x = self.Decoder_conv[i](x) # Convolutional layers
             x = self.Decoder_conv[i+1](x) # BatchNorm
             x = relu(x)
-            if DROPOUT:
+            if use_dropout:
                 x = dropout2d(x, p=do_p_conv)
         return x.view(batch_size,-1,channels*2,height,width)
 
@@ -439,7 +458,7 @@ class Aux_decoder(nn.Module):
             xzy = self.Decoder_aux[i+1](xzy)
             xzy = xzy.permute(0,2,1)
             xzy = relu(xzy)
-            if DROPOUT:
+            if use_dropout:
                 xzy = dropout(xzy, p=do_p_lin)
         a = xzy
         return a        
@@ -477,7 +496,7 @@ class Classifier(nn.Module):
                 xa = self.Classifier[i+1](xa)
                 xa = xa.permute(0,2,1) # and permute back again.
             xa = relu(xa)
-            if DROPOUT:
+            if use_dropout:
                 xa = dropout(xa, p=0.3)
         return softmax(xa,dim=-1)
 
