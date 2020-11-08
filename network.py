@@ -164,7 +164,7 @@ class CNN_VAE(nn.Module):
         outputs["x_log_var"] = x_log_var 
         
         # auxillary outputs
-        if self.aux_variables > 0:      
+        if self.params['aux_variables'] > 0:      
             outputs["q_a_mu"] = q_a_mu
             outputs["q_a_log_var"] = q_a_log_var
             outputs["p_a_mu"] = a_mean
@@ -198,8 +198,8 @@ class CNN_VAE(nn.Module):
     
     def sample_from_latent(self, x):
         x_UL = []
-        for j in range(self.num_classes):
-            tmp = self.decoder(x.unsqueeze(1).repeat(1,self.num_samples,1), 
+        for j in range(self.params['num_classes']):
+            tmp = self.decoder(x.unsqueeze(1).repeat(1,self.params['num_samples'],1), 
                                self.sample_y(self.params['batch_size'], self.params['num_samples'], 
                                              self.params['num_classes'], j))
             x_UL.append(tmp)

@@ -71,8 +71,8 @@ batchnorm_momentum = 0.2
 # Conv/Deconv Layers
 conv_out_channels = [32, 32, 64, 64]
 conv_kernel =  [5, 5, 3, 3]
-conv_padding = [1, 0, 1, 1]
-conv_stride =  [2, 1, 1, 1]
+conv_padding = [1, 1, 1, 1]
+conv_stride =  [1, 1, 1, 1]
 
 # MaxPool Layers
 pool_kernel = 2
@@ -137,7 +137,7 @@ num_samples_unlabelled = 10
 num_samples_labelled = 10
 num_samples_test = 10
 
-root_data = r'C:\Users\Malte\Documents\DTU\7. semester\Deep learning\code_v2.0\rsna-pneumonia-detection-challenge'
+root_data = r'rsna-pneumonia-detection-challenge'
 
 # Load data with dataloader
 print('Loading unlabelled..')
@@ -189,10 +189,10 @@ if cuda:
     u = u.cuda(device=0)
 # Run through network with unlabelled data
 outputs = net(u)    
-elbo_u, elbo_H, elbo_L, kl_u, likelihood_u, kl_u_x, kl_u_a= loss_function(u,outputs)
+elbo_u, elbo_H, elbo_L, kl_u, likelihood_u, kl_u_x, kl_u_a= loss_function(params, u, outputs)
 # Run through network with labelled data
 outputs = net(x,y_hot)
-elbo_l, kl, likelihood_l, kl_l_x, kl_l_a= loss_function(x,outputs,y_hot)
+elbo_l, kl, likelihood_l, kl_l_x, kl_l_a= loss_function(params, x, outputs, y_hot)
 
 
 # Print dimensions of output 
@@ -308,7 +308,7 @@ for epoch in range(num_epochs):
         classification_loss =  alpha * balanced_binary_cross_entropy( logits, y_hot)
         acc = balanced_accuracy( logits, y_hot)
         batch_acc.append(100*acc)
-        elbo_l, kl_l, likelihood_l, kl_l_x, kl_l_a = loss_function(x, outputs, y_hot,kl_warmup)
+        elbo_l, kl_l, likelihood_l, kl_l_x, kl_l_a = loss_function(params, x, outputs, y_hot,kl_warmup)
         kl_l_x = kl_l_x.cpu().detach().numpy()
         kl_l_a = kl_l_a.cpu().detach().numpy()
         
@@ -378,7 +378,7 @@ for epoch in range(num_epochs):
         
         #### Unlabelled
         outputs = net(u)
-        elbo_u, elbo_H, elbo_L, kl_u, likelihood_u, kl_u_x, kl_u_a = loss_function(u, outputs, None, kl_warmup)
+        elbo_u, elbo_H, elbo_L, kl_u, likelihood_u, kl_u_x, kl_u_a = loss_function(params, u, outputs, None, kl_warmup)
         elbo_H = elbo_H.cpu().detach().numpy()
         elbo_L = elbo_L.cpu().detach().numpy()
         kl_u_x = kl_u_x.cpu().detach().numpy()
@@ -401,9 +401,9 @@ for epoch in range(num_epochs):
         #classification_loss = alpha*torch.nn.functional.binary_cross_entropy(logits,y_hot, weight=classWeight)
         #classification_loss = torch.sum(torch.abs(y_hot - logits))
         #classification_loss = alpha*torch.nn.functional.binary_cross_entropy(logits,y_hot)
-        classification_loss = alpha * balanced_binary_cross_entropy(params, logits, y_hot)
+        classification_loss = alpha * balanced_binary_cross_entropy(logits, y_hot)
         # elbo, kl = loss_function(x_hat, x, mu, log_var)
-        elbo_l, kl_l, likelihood_l, kl_l_x, kl_l_a = loss_function(x, outputs, kl_warmup)
+        elbo_l, kl_l, likelihood_l, kl_l_x, kl_l_a = loss_function(params, x, outputs, kl_warmup)
         kl_l_x = kl_l_x.cpu().detach().numpy()
         kl_l_a = kl_l_a.cpu().detach().numpy()
         
