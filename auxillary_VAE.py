@@ -71,6 +71,7 @@ testloader = DataLoader(testDataset, batch_size=batch_size//2, collate_fn=collat
 Define the global parameters of the network.
 '''
 img_dimension = [122, 122]
+
 params = {'latent_features': latent_features,
             'num_samples': num_samples,
             'img_dimension': img_dimension,
@@ -88,16 +89,16 @@ params = {'latent_features': latent_features,
             'num_conv': num_conv,
             'num_lin': num_lin,
             'num_aux': num_aux,
-            'num_class': num_class,
             'num_aux_decoder': num_aux_decoder,
             'lin_layer': lin_layer,
             'aux_layer': aux_layer,
             'do_p_conv': do_p_conv,
             'do_p_lin': do_p_lin,
-            'height': height,
-            'width': width,
             'channels': channels,
-            'conv_stride': conv_stride}
+            'conv_stride': conv_stride,
+            'aux_decoder_layers': aux_decoder_layers,
+            'classifier_layer': classifier_layer}
+
 
 #%%
 '''
@@ -187,8 +188,6 @@ train_L, train_H, train_kl_u_x, train_kl_u_a, train_elbo_l, train_kl_l_x, train_
 valid_L, valid_H, valid_kl_u_x, valid_kl_u_a, valid_elbo_l, valid_kl_l_x, valid_kl_l_a = [], [], [], [], [], [], []
 # train_latent_loss, valid_latent_loss = [], []
 total_loss = []
-
-
 
 # Classification Loss
 alpha = 10 * (num_samples_unlabelled + num_samples_labelled) / num_samples_labelled   

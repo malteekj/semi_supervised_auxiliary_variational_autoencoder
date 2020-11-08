@@ -67,41 +67,11 @@ cuda = torch.cuda.is_available()
 # num_aux_decoder = len(aux_decoder_layers)
 
 
-params = {'latent_features': latent_features,
-            'num_samples': num_samples,
-            'img_dimension': img_dimension,
-            'aux_variables': aux_variables,
-            'use_dropout': use_dropout,
-            'do_p_lin': do_p_lin,
-            'do_p_conv': do_p_conv,
-            'batch_size': batch_size,
-            'conv_out_channels': conv_out_channels,
-            'conv_kernel': conv_kernel,
-            'conv_padding': conv_padding,
-            'lin_layer': lin_layer,
-            'num_classes': num_classes,
-            'batchnorm_momentum': batchnorm_momentum,
-            'num_conv': num_conv,
-            'num_lin': num_lin,
-            'num_aux': num_aux,
-            'num_aux_decoder': num_aux_decoder,
-            'lin_layer': lin_layer,
-            'aux_layer': aux_layer,
-            'do_p_conv': do_p_conv,
-            'do_p_lin': do_p_lin,
-            'height': height,
-            'width': width,
-            'channels': channels,
-            'conv_stride': conv_stride,
-            'aux_decoder_layers': aux_decoder_layers,
-            'classifier_layer': classifier_layer}
 
-    
 
 '''
 Network
-'''
-       
+'''       
 class CNN_VAE(nn.Module):
     def __init__(self, params):
         super(CNN_VAE, self).__init__(), 
@@ -114,7 +84,7 @@ class CNN_VAE(nn.Module):
                                           params['pool_kernel'], params['pool_padding'], params['pool_stride'])
         
         
-        self.encoder = Encoder(height=params['height'], width=params['width'], conv_out_channels=params['conv_out_channels'], 
+        self.encoder = Encoder(height=params['img_dimension'][0], width=params['img_dimension'][1], conv_out_channels=params['conv_out_channels'], 
                  num_conv=params['num_conv'], input_channels=params['input_channels'], conv_kernel=params['conv_kernel'], 
                  conv_stride=params['conv_stride'], conv_padding=params['conv_padding'], batchnorm_momentum=params['batchnorm_momentum'], 
                  pool_kernel=params['pool_kernel'], pool_stride=params['pool_stride'], pool_padding=params['pool_padding'], 
@@ -192,8 +162,8 @@ class CNN_VAE(nn.Module):
         outputs["log_var"] = log_var
         
         # image recontructions (notice they are outputted as matrices)
-        outputs["x_mean"] =  x_mean #x_hat  # mean reconstructions (for loss!!!)
-        outputs["x_log_var"] = x_log_var #torch.reshape(x_log_var,(-1,height,width)) # log var reconstructions (for loss!!!)
+        outputs["x_mean"] =  x_mean 
+        outputs["x_log_var"] = x_log_var 
         
         # auxillary outputs
         if self.aux_variables > 0:      
@@ -448,7 +418,7 @@ class Decoder(nn.Module):
             x = relu(x)
             if params['use_dropout']:
                 x = dropout2d(x, p=params['do_p_conv'])
-        return x.view(params['batch_size'],-1,params['channels']*2,params['height'],params['width'])
+        return x.view(params['batch_size'],-1,params['channels']*2,params['img_dimension'][0],params['img_dimension'][1])
 
 class Aux_decoder(nn.Module):
     def __init__(self, params):
