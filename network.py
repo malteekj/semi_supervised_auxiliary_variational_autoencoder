@@ -101,11 +101,11 @@ class CNN_VAE(nn.Module):
         self.add_module("Additional_layer",Additional_layer)
        
         # Initialize weight of layers
-        for m in self.modules():
-            if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
-                nn.init.xavier_normal(m.weight.data)
-                if m.bias is not None:
-                    m.bias.data = torch.tensor(0.01)
+        # for m in self.modules():
+        #     if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+        #         nn.init.xavier_normal(m.weight.data)
+        #         if m.bias is not None:
+        #             m.bias.data = 0.01
                 
     def forward(self, x, y=None):
         outputs = {}
@@ -116,7 +116,7 @@ class CNN_VAE(nn.Module):
         x = self.encoder(x);
         
         ## Run through auxillary encoder
-        if self.aux_variables > 0:
+        if self.params['aux_variables']> 0:
             q_a_mu, q_a_log_var = self.aux_encoder(x)
             q_a = gaussian_sample(q_a_mu,q_a_log_var,self.params['num_samples'],self.params['aux_variables']) # sample auxillary variables
             xa = torch.cat([x.unsqueeze(1).repeat(1,self.params['num_samples'],1),q_a],dim=2) # Create combined vector of x and q_a
@@ -132,7 +132,7 @@ class CNN_VAE(nn.Module):
         lat_in = self.run_module(self.map_to_latent_space,xa,y)
         if y is None:
             # marginalize over y sampling.
-            lat_in = marginalizeY(lat_in,self.num_classes,1)
+            lat_in = marginalizeY(lat_in,self.params['num_classes'],1)
         # Split into mu and log_var
         mu, log_var = torch.chunk(lat_in, 2, dim=-1)
         # Make sure that the log variance is positive
@@ -141,7 +141,7 @@ class CNN_VAE(nn.Module):
         z = gaussian_sample(mu,log_var, self.params['num_samples']*mu.size(1), self.params['latent_features'])
         
         ## aux. decoder
-        if self.aux_variables > 0:
+        if self.params['aux_variables']> 0:
             xz = torch.cat([z, x.unsqueeze(1).repeat(1,z.shape[1],1)], dim = -1)
             ## Expand to be able to sample from y
             a = self.run_module(self.aux_decoder,xz,y)
@@ -297,7 +297,7 @@ class Encoder(nn.Module):
             x = self.Encoder_conv[i+1](x) # Batchnorm layer
             x = relu(x)
             if self.use_dropout:
-                x = dropout2d(x, p=self.do_p_conv)   
+                x = dropout2d(x, p=self.params['do_p_conv'])   
             x = self.Encoder_conv[i+2](x) # Maxpool Layer
         x = x.view(self.batch_size, -1) # Prepare x for linear layers
         
@@ -350,6 +350,7 @@ class Decoder(nn.Module):
     def __init__(self, params, layer_size):
         super(Decoder, self).__init__()
         self.layer_size = layer_size
+        self.params = params
         
         self.final_dim = compute_final_dimension(height=params['img_dimension'][0], 
                             width=params['img_dimension'][1], last_num_channels=params['conv_out_channels'][-1], 
@@ -417,7 +418,8 @@ class Decoder(nn.Module):
             x = relu(x)
             if self.params['use_dropout']:
                 x = dropout2d(x, p=self.params['do_p_conv'])
-        return x.view(self.params['batch_size'],-1,self.params['channels']*2,self.params['img_dimension'][0],self.params['img_dimension'][1])
+        return x.view(self.params['batch_size'], -1, self.params['input_channels']*2,
+                      self.params['img_dimension'][0],self.params['img_dimension'][1])
 
 class Aux_decoder(nn.Module):
     def __init__(self, params):

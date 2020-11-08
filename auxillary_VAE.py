@@ -25,6 +25,7 @@ from sklearn.decomposition import PCA
 from dataFunctions import RSNADataset, collate_fn_balanced_batch
 from network import CNN_VAE
 from lossFunctions import Gaussian_density, kl_a_calc, ELBO_loss, normalize, balanced_accuracy, balanced_binary_cross_entropy, balanced_accuracy_test
+
 #%%
 '''
 ### Work log ###
@@ -170,7 +171,7 @@ print(net)
 optimizer = optim.Adam(net.parameters(), lr=learning_rate)
 loss_function = ELBO_loss
 
-#%%
+#%
 '''
 Test the outputs of the network
 '''
