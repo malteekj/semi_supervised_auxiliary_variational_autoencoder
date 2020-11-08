@@ -66,9 +66,6 @@ cuda = torch.cuda.is_available()
 # num_class = len(classifier_layer)
 # num_aux_decoder = len(aux_decoder_layers)
 
-
-
-
 '''
 Network
 '''       
@@ -84,16 +81,17 @@ class CNN_VAE(nn.Module):
                                           params['pool_kernel'], params['pool_padding'], params['pool_stride'])
         
         
-        self.encoder = Encoder(height=params['img_dimension'][0], width=params['img_dimension'][1], conv_out_channels=params['conv_out_channels'], 
-                 num_conv=params['num_conv'], input_channels=params['input_channels'], conv_kernel=params['conv_kernel'], 
-                 conv_stride=params['conv_stride'], conv_padding=params['conv_padding'], batchnorm_momentum=params['batchnorm_momentum'], 
-                 pool_kernel=params['pool_kernel'], pool_stride=params['pool_stride'], pool_padding=params['pool_padding'], 
-                 num_lin=params['num_lin'], lin_layer=params['lin_layer'], do_p_lin=params['do_p_lin'], use_dropout=params['use_dropout'],
-                 batch_size=params['batch_size'])
-        self.decoder = Decoder(self.layer_size)
-        self.classifier = Classifier()
-        self.aux_encoder = Aux_encoder()
-        self.aux_decoder = Aux_decoder()
+        # self.encoder = Encoder(height=params['img_dimension'][0], width=params['img_dimension'][1], conv_out_channels=params['conv_out_channels'], 
+        #          num_conv=params['num_conv'], input_channels=params['input_channels'], conv_kernel=params['conv_kernel'], 
+        #          conv_stride=params['conv_stride'], conv_padding=params['conv_padding'], batchnorm_momentum=params['batchnorm_momentum'], 
+        #          pool_kernel=params['pool_kernel'], pool_stride=params['pool_stride'], pool_padding=params['pool_padding'], 
+        #          num_lin=params['num_lin'], lin_layer=params['lin_layer'], do_p_lin=params['do_p_lin'], use_dropout=params['use_dropout'],
+        #          batch_size=params['batch_size'])
+        self.encoder = Encoder(params)
+        self.decoder = Decoder(params, self.layer_size)
+        self.classifier = Classifier(params)
+        self.aux_encoder = Aux_encoder(params)
+        self.aux_decoder = Aux_decoder(params)
         
         # map to latent space
         Additional_layer = nn.ModuleList()
@@ -107,7 +105,7 @@ class CNN_VAE(nn.Module):
             if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
                 nn.init.xavier_normal(m.weight.data)
                 if m.bias is not None:
-                    m.bias.data = 0.01
+                    m.bias.data = torch.tensor(0.01)
                 
     def forward(self, x, y=None):
         outputs = {}
@@ -239,51 +237,51 @@ class CNN_VAE(nn.Module):
 Encoders
 '''
 class Encoder(nn.Module): 
-    def __init__(self, params, height=None, width=None, conv_out_channels=None, num_conv=None, input_channels=None, 
-                 conv_kernel=None, conv_stride=None, conv_padding=None, batchnorm_momentum=None, pool_kernel=None, pool_stride=None, 
-                 pool_padding=None, num_lin=None, lin_layer=None, do_p_lin=None, use_dropout=False, batch_size=None):
+    def __init__(self, params):
         super(Encoder, self).__init__()
         
         self.params = params
         
         # Dropout params
-        self.do_p_lin = do_p_lin
-        self.use_dropout = use_dropout
-        self.batch_size = batch_size
+        self.do_p_lin = params['do_p_lin']
+        self.use_dropout = params['use_dropout']
+        self.batch_size = params['batch_size']
         
         
         # height, width, last_num_channels, num_layers, conv_kernel, conv_padding, 
         #                     conv_stride, pool_kernel, pool_padding, pool_stride
         # Calculate final size of the CNN
         self.final_dim = compute_final_dimension(height=params['img_dimension'][0], 
-                            width=params['img_dimenion'][1], last_num_channels=params['conv_out_channels'][-1], 
-                            conv_kernel=params['num_conv'], conv_padding=params['conv_padding'], 
-                            conv_stride=params['conv_stride'], pool_kernel=['pool_kernel'], 
-                            pool_padding=['pool_padding'], pool_stride=['pool_stride'])
+                            width=params['img_dimension'][1], last_num_channels=params['conv_out_channels'][-1],
+                            num_conv=params['num_conv'],
+                            conv_kernel=params['conv_kernel'], conv_padding=params['conv_padding'], 
+                            conv_stride=params['conv_stride'], pool_kernel=params['pool_kernel'], 
+                            pool_padding=params['pool_padding'], pool_stride=params['pool_stride'])
         
+        in_channels = params['input_channels']
         ## Convolutional layers of the encoder
         Encoder_conv = nn.ModuleList()
-        for i in range(num_conv):
-            Encoder_conv.append(Conv2d( in_channels=input_channels,
-                                            out_channels=conv_out_channels[i],
-                                            kernel_size=conv_kernel[i],
-                                            stride=conv_stride[i],
-                                            padding=conv_padding[i]))
-            Encoder_conv.append(BatchNorm2d(conv_out_channels[i], momentum = batchnorm_momentum))
-            Encoder_conv.append(MaxPool2d(  kernel_size=pool_kernel, 
-                                        stride=pool_stride,
-                                        padding=pool_padding,
+        for i in range(params['num_conv']):
+            Encoder_conv.append(Conv2d( in_channels=in_channels,
+                                            out_channels=params['conv_out_channels'][i],
+                                            kernel_size=params['conv_kernel'][i],
+                                            stride=params['conv_stride'][i],
+                                            padding=params['conv_padding'][i]))
+            Encoder_conv.append(BatchNorm2d(params['conv_out_channels'][i]))
+            Encoder_conv.append(MaxPool2d(  kernel_size=params['pool_kernel'], 
+                                        stride=params['pool_stride'],
+                                        padding=params['pool_padding'],
                                         return_indices = False))
-            input_channels = conv_out_channels[i]
+            in_channels = params['conv_out_channels'][i]
         self.add_module("Encoder_conv",Encoder_conv)
         
         # Fully connected layers of encoder
         Encoder_FC = nn.ModuleList()
         in_weights = self.final_dim[0]
-        for i in range(num_lin):
-            Encoder_FC.append(Linear(in_features=in_weights, out_features=lin_layer[i]))
-            Encoder_FC.append(BatchNorm1d(lin_layer[i], momentum = batchnorm_momentum))
-            in_weights = lin_layer[i]
+        for i in range(params['num_lin']):
+            Encoder_FC.append(Linear(in_features=in_weights, out_features=params['lin_layer'][i]))
+            Encoder_FC.append(BatchNorm1d(params['lin_layer'][i]))
+            in_weights = params['lin_layer'][i]
         self.add_module("Encoder_FC",Encoder_FC)
         
     def forward(self,x):
@@ -340,7 +338,7 @@ class Aux_encoder(nn.Module):
             a = self.Encoder_aux[i+1](a)
             a = relu(a)
             if self.params['use_dropout']:
-                a = dropout(a, p=params['do_p_lin'])
+                a = dropout(a, p=self.params['do_p_lin'])
         q_a_mu, q_a_log_var = torch.chunk(a, 2, dim=-1) # divide to mu and sigma
         return q_a_mu, q_a_log_var
  
@@ -349,15 +347,15 @@ class Aux_encoder(nn.Module):
 Decoders
 '''
 class Decoder(nn.Module):
-    def __init__(self,layer_size, params):
+    def __init__(self, params, layer_size):
         super(Decoder, self).__init__()
         self.layer_size = layer_size
         
         self.final_dim = compute_final_dimension(height=params['img_dimension'][0], 
-                            width=params['img_dimenion'][1], last_num_channels=params['conv_out_channels'][-1], 
-                            conv_kernel=params['num_conv'], conv_padding=params['conv_padding'], 
-                            conv_stride=params['conv_stride'], pool_kernel=['pool_kernel'], 
-                            pool_padding=['pool_padding'], pool_stride=['pool_stride'])
+                            width=params['img_dimension'][1], last_num_channels=params['conv_out_channels'][-1], 
+                            conv_kernel=params['conv_kernel'], conv_padding=params['conv_padding'], 
+                            conv_stride=params['conv_stride'], pool_kernel=params['pool_kernel'], 
+                            pool_padding=params['pool_padding'], pool_stride=params['pool_stride'], num_conv=params['num_conv'])
 
         # Initialize fully connected layers from latent space to convolutional layers
         Decoder_FC = nn.ModuleList()
@@ -376,11 +374,12 @@ class Decoder(nn.Module):
         Decoder_conv = nn.ModuleList()
         for i in reversed(range(params['num_conv'])):
             if i == 0:
-                output_channels = params['channels']*2
+                output_channels = params['input_channels']*2
             else:
                 output_channels = params['conv_out_channels'][i-1] 
+                
             Decoder_conv.append(ConvTranspose2d(in_channels=params['conv_out_channels'][i],
-                                                out_channels=params['output_channels'],
+                                                out_channels=output_channels,
                                                 kernel_size=params['conv_kernel'][i],
                                                 stride=params['conv_stride'][i],
                                                 padding=params['conv_padding'][i]))
@@ -403,7 +402,7 @@ class Decoder(nn.Module):
             x = self.Decoder_FC[i+1](x)
             x = x.permute(0,2,1)
             x = relu(x)
-            x = dropout(x, p=params['do_p_lin'])
+            x = dropout(x, p=self.params['do_p_lin'])
         x = x.reshape(-1, self.Decoder_conv[0].in_channels, self.final_dim[1], self.final_dim[2])
         
         # Convolutional layers of decoder
@@ -416,9 +415,9 @@ class Decoder(nn.Module):
             x = self.Decoder_conv[i](x) # Convolutional layers
             x = self.Decoder_conv[i+1](x) # BatchNorm
             x = relu(x)
-            if params['use_dropout']:
-                x = dropout2d(x, p=params['do_p_conv'])
-        return x.view(params['batch_size'],-1,params['channels']*2,params['img_dimension'][0],params['img_dimension'][1])
+            if self.params['use_dropout']:
+                x = dropout2d(x, p=self.params['do_p_conv'])
+        return x.view(self.params['batch_size'],-1,self.params['channels']*2,self.params['img_dimension'][0],self.params['img_dimension'][1])
 
 class Aux_decoder(nn.Module):
     def __init__(self, params):
@@ -457,7 +456,7 @@ class Classifier(nn.Module):
         super(Classifier, self).__init__()
         self.params = params
         Classifier_layers = nn.ModuleList()
-        if params['aux_variables ']> 0:
+        if params['aux_variables']> 0:
             in_weights = params['lin_layer'][-1]+params['aux_variables']
         else:
             in_weights = params['lin_layer'][-1]
@@ -497,12 +496,13 @@ def compute_conv_dim(height, width, kernel_size, padding_size, stride_size):
     width_new =  int((width  - kernel_size + 2 * padding_size) / stride_size + 1)
     return [height_new, width_new]
 
-def compute_final_dimension(height, width, last_num_channels, num_layers, conv_kernel, conv_padding, 
-                            conv_stride, pool_kernel, pool_padding, pool_stride):
+def compute_final_dimension(height=None, width=None, last_num_channels=None, num_conv=None, conv_kernel=None, conv_padding=None, 
+                            conv_stride=None, pool_kernel=None, pool_padding=None, pool_stride=None):
     # First conv layer
     CNN_height = height
     CNN_width = width
-    for i in range(num_layers):
+    
+    for i in range(num_conv):
         # conv layer
         CNN_height, CNN_width = compute_conv_dim(CNN_height, CNN_width, conv_kernel[i], conv_padding[i], conv_stride[i])
         # maxpool layer

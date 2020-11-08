@@ -40,15 +40,102 @@ Completed tasks:
 '''
 
 #%%
+#%% 
+'''
+Define the global parameters of the network.
+'''
+img_dimension = [122, 122]
+batch_size = 2
+
+num_samples = 5
+latent_features = 128
+learning_rate = 1e-4
+
+# Define size variables
+print_shapes = False
+input_channels = 1
+num_features = np.prod(img_dimension)*input_channels
+## 
+classes = [0, 1]
+
+# Regulization
+L2_reg = 1e-6
+use_dropout = True
+do_p_conv = 0.05 # do_p for conv 
+do_p_lin = 0.1 # do_p for linear 
+batchnorm_eps = 1e-5
+batchnorm_momentum = 0.2
+
+## Encoder/Decoder layers:
+# Conv/Deconv Layers
+conv_out_channels = [32, 32, 64, 64]
+conv_kernel =  [5, 5, 3, 3]
+conv_padding = [1, 0, 1, 1]
+conv_stride =  [2, 1, 1, 1]
+
+# MaxPool Layers
+pool_kernel = 2
+pool_padding = 0
+pool_stride = 2
+
+# Fully connected layers
+lin_layer = [500, 200]
+
+## Auxillary network layers:
+aux_layer = [500, 200]
+aux_variables = 32
+aux_in = 2 # layer no. where a is included in encoder
+aux_decoder_layers = [100, 200]
+
+## Classifier network layers:
+classifier_layer = [500,200,200]
+num_classes = len(classes)
+
+# No. of layes
+num_conv = len(conv_out_channels)
+num_lin = len(lin_layer)
+num_aux = len(aux_layer)
+num_class = len(classifier_layer)
+num_aux_decoder = len(aux_decoder_layers)
+
+params = {'latent_features': latent_features,
+            'num_samples': num_samples,
+            'img_dimension': img_dimension,
+            'aux_variables': aux_variables,
+            'use_dropout': use_dropout,
+            'do_p_lin': do_p_lin,
+            'do_p_conv': do_p_conv,
+            'batch_size': batch_size,
+            'conv_out_channels': conv_out_channels,
+            'conv_kernel': conv_kernel,
+            'conv_padding': conv_padding,
+            'num_classes': num_classes,
+            'batchnorm_momentum': batchnorm_momentum,
+            'num_conv': num_conv,
+            'num_lin': num_lin,
+            'num_aux': num_aux,
+            'num_aux_decoder': num_aux_decoder,
+            'lin_layer': lin_layer,
+            'aux_layer': aux_layer,
+            'do_p_conv': do_p_conv,
+            'conv_stride': conv_stride,
+            'aux_decoder_layers': aux_decoder_layers,
+            'classifier_layer': classifier_layer,
+            'pool_kernel': pool_kernel,
+            'pool_padding': pool_padding,
+            'pool_stride': pool_stride,
+            'input_channels': input_channels}
+
+
+#%%
 '''
 Load data (Done)
 '''
 # Dataloader settings
-'''
 num_samples_unlabelled = 10
 num_samples_labelled = 10
 num_samples_test = 10
-'''
+
 root_data = r'C:\Users\Malte\Documents\DTU\7. semester\Deep learning\code_v2.0\rsna-pneumonia-detection-challenge'
 
 # Load data with dataloader
@@ -66,39 +153,6 @@ testDataset = RSNADataset(num_samples=num_samples_test, num_samples_U=num_sample
 trainloader_labelled = DataLoader(trainDataset_labelled, batch_size=batch_size//2, collate_fn=collate_fn_balanced_batch)
 trainloader_unlabelled = DataLoader(trainDataset_unlabelled, batch_size=batch_size//2, collate_fn=collate_fn_balanced_batch)
 testloader = DataLoader(testDataset, batch_size=batch_size//2, collate_fn=collate_fn_balanced_batch)
-#%% 
-'''
-Define the global parameters of the network.
-'''
-img_dimension = [122, 122]
-
-params = {'latent_features': latent_features,
-            'num_samples': num_samples,
-            'img_dimension': img_dimension,
-            'aux_variables': aux_variables,
-            'use_dropout': use_dropout,
-            'do_p_lin': do_p_lin,
-            'do_p_conv': do_p_conv,
-            'batch_size': batch_size,
-            'conv_out_channels': conv_out_channels,
-            'conv_kernel': conv_kernel,
-            'conv_padding': conv_padding,
-            'lin_layer': lin_layer,
-            'num_classes': num_classes,
-            'batchnorm_momentum': batchnorm_momentum,
-            'num_conv': num_conv,
-            'num_lin': num_lin,
-            'num_aux': num_aux,
-            'num_aux_decoder': num_aux_decoder,
-            'lin_layer': lin_layer,
-            'aux_layer': aux_layer,
-            'do_p_conv': do_p_conv,
-            'do_p_lin': do_p_lin,
-            'channels': channels,
-            'conv_stride': conv_stride,
-            'aux_decoder_layers': aux_decoder_layers,
-            'classifier_layer': classifier_layer}
-
 
 #%%
 '''
@@ -110,7 +164,7 @@ latent_features = 128
 batch_size = 2
 learning_rate = 1e-4
 
-net = CNN_VAE(latent_features, num_samples)
+net = CNN_VAE(params)
 print(net)
 
 optimizer = optim.Adam(net.parameters(), lr=learning_rate)
