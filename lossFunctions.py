@@ -4,12 +4,26 @@ import math
 import torch
 
 def Gaussian_density(sample_img,mu_img,log_var_img):
+    """
+    Log likelihood of a Gaussian density (http://jrmeyer.github.io/machinelearning/2017/08/18/mle.html):
+    sum_1^n [ -0.5 * log(2π) - log(var)/2 - (x - mean)^2 / (2*var) ]
+
+    All inputs are w/ dimensions: ? [batch_size, channels, width, height]
+
+    :param sample_img: sample x
+    :param mu_img: mean
+    :param log_var_img: logarithm of the variance
+    :return: log likelihood averaged across all batches and pixels
+    """
     c = - 0.5 * math.log(2 * math.pi)
-    density = c - log_var_img/2 - (sample_img - mu_img)**2/(2 * torch.exp(log_var_img))
-    #density = c -  (sample_img - mu_img)**2/(2 * torch.exp(log_var_img))
-    #print("Density:",density)
-    #print("Density.shape:", density.shape)
-    return torch.mean(density,dim = 1) # Sum over channels
+    log_likelihood = c - log_var_img/2 - (sample_img - mu_img)**2/(2 * torch.exp(log_var_img))
+    #log_likelihood = c -  (sample_img - mu_img)**2/(2 * torch.exp(log_var_img))
+    #print("log_likelihood:",log_likelihood)
+    #print("log_likelihood.shape:", log_likelihood.shape)
+    log_likelihood = torch.mean(log_likelihood, dim=1)  # Sum over channels
+    log_likelihood = log_likelihood.view(batch_size, -1)
+    log_likelihood = torch.mean(log_likelihood, dim=1) # Sum over features (224x224 = 50,176)
+    return log_likelihood
 
 def kl_a_calc(q_a, q_mu, q_log_var,p_mu, p_log_var):
     # The function assumes: 
@@ -58,14 +72,14 @@ def ELBO_loss(sample_img, outputs, y = None, kl_warmup = None):
         a_log_var = torch.chunk(outputs['p_a_log_var'],num_classes,dim=1)
         for j in range(num_classes):
             likelihood = Gaussian_density(sample_img, torch.mean(x_mean[j],dim = 1), torch.mean(x_log_var[j],dim = 1))
+            # likelihood = likelihood.view(batch_size, -1)
+            # likelihood = torch.mean(likelihood, dim=1) # Sum over features (224x224 = 50,176)
             if aux_variables > 0:
                 kl_a = kl_a_calc(outputs["q_a"],outputs["q_a_mu"],outputs["q_a_log_var"],torch.mean(a_mean[j],dim = 1),torch.mean(a_log_var[j],dim = 1))
                 kl = w1 * kl_x + (1 - w1) * kl_a
             else:
                 kl_a = torch.Tensor([0])
-                kl = kl_x 
-            likelihood = likelihood.view(batch_size, -1)
-            likelihood = torch.mean(likelihood, dim=1) # Sum over features (224x224 = 50,176)
+                kl = kl_x
             ELBO.append(w2 * likelihood - (1 - w2) * beta * kl)
         L = torch.stack(ELBO).t()
         #L = torch.cat( (torch.unsqueeze(ELBO[0],1),torch.unsqueeze(ELBO[1],1)),dim =1 )
@@ -81,6 +95,8 @@ def ELBO_loss(sample_img, outputs, y = None, kl_warmup = None):
         return -torch.mean(U), -torch.mean(H), -torch.mean(L),  (1 - w2) * beta * torch.mean(kl), -w2 * torch.mean(likelihood), w1*torch.mean(kl_x), (1-w1)*torch.mean(kl_a)
     else:
         likelihood = Gaussian_density(sample_img, torch.mean(outputs['x_mean'],dim = 1), torch.mean(outputs['x_log_var'],dim = 1))
+        # likelihood = likelihood.view(batch_size, -1)
+        # likelihood = torch.mean(likelihood, dim=1) # Sum over features (224x224 = 50,176)
         kl_x = -0.5 * torch.sum(1 + outputs['log_var'] - outputs['mu']**2 - torch.exp(outputs['log_var']), dim=1)
         kl_x = torch.sum(kl_x,dim=1) # sum over the features
         if aux_variables > 0:
@@ -89,8 +105,6 @@ def ELBO_loss(sample_img, outputs, y = None, kl_warmup = None):
         else:
             kl_a = torch.Tensor([0])
             kl = torch.mean(kl_x)
-        likelihood = likelihood.view(batch_size, -1)
-        likelihood = torch.mean(likelihood, dim=1) # Sum over features (224x224 = 50,176)
         ELBO = w2 * torch.mean(likelihood) - (1 - w2) * beta * kl    
         # Notice minus sign as we want to maximise ELBO
         return -ELBO, (1 - w2) * beta * kl, -w2 * torch.mean(likelihood), w1*torch.mean(kl_x), (1-w1)*torch.mean(kl_a)
@@ -106,7 +120,7 @@ def ELBO_loss(sample_img, outputs, y = None, kl_warmup = None):
     # mean over batch
 
 # Function to normalize a single image
-def normalize_2(x):
+def normalize(x):
     # Input: [1, height, width]
     x_shape = x.shape
     x = x.view(1,-1)
