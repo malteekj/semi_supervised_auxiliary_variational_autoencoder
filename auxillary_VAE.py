@@ -24,7 +24,7 @@ from sklearn.decomposition import PCA
 # Custom functions
 from dataFunctions import RSNADataset, collate_fn_balanced_batch
 from network import CNN_VAE
-from lossFunctions import Gaussian_density, kl_a_calc, ELBO_loss, normalize, balanced_accuracy, balanced_binary_cross_entropy, balanced_accuracy_test
+from lossFunctions import Gaussian_density, kl_a_calc, ELBO_loss, normalize, balanced_accuracy, balanced_binary_cross_entropy
 
 #%%
 '''
@@ -46,7 +46,7 @@ Completed tasks:
 Define the global parameters of the network.
 '''
 img_dimension = [122, 122]
-batch_size = 2
+batch_size = 4
 
 num_samples = 5
 latent_features = 128
@@ -133,9 +133,9 @@ params = {'latent_features': latent_features,
 Load data (Done)
 '''
 # Dataloader settings
-num_samples_unlabelled = 10
-num_samples_labelled = 10
-num_samples_test = 10
+num_samples_unlabelled = 100
+num_samples_labelled = 100
+num_samples_test = 100
 
 root_data = r'rsna-pneumonia-detection-challenge'
 
@@ -160,10 +160,6 @@ testloader = DataLoader(testDataset, batch_size=batch_size//2, collate_fn=collat
 Define the network and optimizer
 '''
 # num_samples is the number of samples drawn from the 
-num_samples = 5
-latent_features = 128
-batch_size = 2
-learning_rate = 1e-4
 
 net = CNN_VAE(params)
 print(net)
@@ -217,9 +213,6 @@ print('Class. loss: ',classification_loss)
 print('Likelihood:  ',likelihood_l)
 
 #%%
-num_samples_labelled = 10
-num_samples_unlabelled = 10
-
 
 # Deleting variable Image and reload package Image
 # get_ipython().run_line_magic('reset_selective', '-f "^Image$"')
@@ -524,6 +517,7 @@ for epoch in range(num_epochs):
     with torch.no_grad():
         epsilon = torch.randn(batch_size, latent_features).to(device)
         samples = torch.sigmoid(net.sample_from_latent(epsilon)).cpu().detach().numpy()
+    print(samples.shape)
 
     canvas = np.zeros((img_dimension[0]*rows, img_dimension[1]*columns))
     for i in range(rows):
@@ -532,7 +526,7 @@ for epoch in range(num_epochs):
             #temp_img = samples[idx].reshape((224, 224))
             #canvas[i*28:(i+1)*28, j*28:(j+1)*28] = resize(temp_img, output_shape=[28,28], mode='reflect', anti_aliasing=True)
             canvas[i*img_dimension[0]:(i+1)*img_dimension[0], j*img_dimension[1]:(j+1)*img_dimension[1]] = \
-                samples[idx,0:img_dimension[0]*img_dimension[1]].reshape(img_dimension)
+                samples[idx,0:np.prod(img_dimension)].reshape(img_dimension)
     ax.imshow(canvas, cmap='gray')
 
     # Input images
@@ -639,10 +633,8 @@ for epoch in range(num_epochs):
         ax.legend(['Train. kl_l_x',  'Train. kl_l_a'])
         #ax.legend(['Train. kl_l_x',  'Train. kl_l_a',  'Latent_loss'])
     
-    clear_output(wait=True)
     plt.savefig(tmp_img)
     plt.close(f)
-    display(Image(filename=tmp_img))
 
     os.remove(tmp_img)
     
@@ -665,7 +657,7 @@ for epoch in range(num_epochs):
         outputs = net(x,y_hot)
         logits = outputs["y_hat"]
         y_hot = y_hot.unsqueeze(dim = 1).repeat(1,logits.shape[1],1)
-        acc_1, TP_1, FP_1, FN_1, TN_1, P_1, N_1 = balanced_accuracy_test(logits, y_hot)
+        acc_1, TP_1, FP_1, FN_1, TN_1, P_1, N_1 = balanced_accuracy(logits, y_hot, return_all = True)
         TP += TP_1
         FP += FP_1
         FN += FN_1
@@ -681,7 +673,6 @@ for epoch in range(num_epochs):
     print("FN: ",FN)
     print("P: ",P)
     print("N: ",N)
-#%%
 
 #%%
 '''
