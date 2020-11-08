@@ -52,7 +52,7 @@ def kl_a_calc(q_a, q_mu, q_log_var,p_mu, p_log_var):
     
     return kl
         
-def ELBO_loss(sample_img, outputs, y = None, kl_warmup = None):
+def ELBO_loss(params, sample_img, outputs, y = None, kl_warmup = None):
     # Parameter in deterministic warmup for KL divergence
     beta = 1 if kl_warmup is None else kl_warmup
     
@@ -68,14 +68,15 @@ def ELBO_loss(sample_img, outputs, y = None, kl_warmup = None):
         kl_x = torch.sum(kl_x,dim=1) # sum over the features
         
         # divide into samples of y.
-        x_mean = torch.chunk(outputs['x_mean'], num_classes, dim=1)
-        x_log_var = torch.chunk(outputs['x_log_var'],num_classes,dim=1)
-        a_mean = torch.chunk(outputs['p_a_mu'],num_classes,dim=1)
-        a_log_var = torch.chunk(outputs['p_a_log_var'],num_classes,dim=1)
-        for j in range(num_classes):
+        x_mean = torch.chunk(outputs['x_mean'], params["num_classes"], dim=1)
+        x_log_var = torch.chunk(outputs['x_log_var'], params["num_classes"],dim=1)
+        a_mean = torch.chunk(outputs['p_a_mu'], params["num_classes"],dim=1)
+        a_log_var = torch.chunk(outputs['p_a_log_var'], params["num_classes"],dim=1)
+        for j in range(params["num_classes"]):
             likelihood = Gaussian_density(sample_img, torch.mean(x_mean[j],dim = 1), torch.mean(x_log_var[j],dim = 1))
-            if aux_variables > 0:
-                kl_a = kl_a_calc(outputs["q_a"],outputs["q_a_mu"],outputs["q_a_log_var"],torch.mean(a_mean[j],dim = 1),torch.mean(a_log_var[j],dim = 1))
+            if params["aux_variables"] > 0:
+                kl_a = kl_a_calc(outputs["q_a"], outputs["q_a_mu"], outputs["q_a_log_var"],
+                                 torch.mean(a_mean[j], dim = 1), torch.mean(a_log_var[j], dim = 1))
                 kl = w1 * kl_x + (1 - w1) * kl_a
             else:
                 kl_a = torch.Tensor([0])
@@ -85,20 +86,26 @@ def ELBO_loss(sample_img, outputs, y = None, kl_warmup = None):
         #L = torch.cat( (torch.unsqueeze(ELBO[0],1),torch.unsqueeze(ELBO[1],1)),dim =1 )
         # Calculate entropy H(q(y|x)) and sum over all labels
         logits = torch.mean(outputs['y_hat'],dim = 1) 
-        # Minizing the negative entropy is equivalent to maximizing the certainty of the decisions (logits goes toward 0 or 1 (in a two class problem))
+        # Minizing the negative entropy is equivalent to maximizing the certainty
+        # of the decisions (logits goes toward 0 or 1 (in a two class problem))
         H = -torch.sum(torch.mul(logits, torch.log(logits + 1e-8)), dim=-1) 
         L = torch.sum(torch.mul(logits, L), dim=-1)
         
         # Equivalent to -U(x)
         U = L - H
         
-        return -torch.mean(U), -torch.mean(H), -torch.mean(L),  (1 - w2) * beta * torch.mean(kl), -w2 * torch.mean(likelihood), w1*torch.mean(kl_x), (1-w1)*torch.mean(kl_a)
+        return -torch.mean(U), -torch.mean(H), -torch.mean(L),\
+               (1 - w2) * beta * torch.mean(kl), -w2 * torch.mean(likelihood),\
+               w1*torch.mean(kl_x), (1-w1)*torch.mean(kl_a)
     else:
-        likelihood = Gaussian_density(sample_img, torch.mean(outputs['x_mean'],dim = 1), torch.mean(outputs['x_log_var'],dim = 1))
+        likelihood = Gaussian_density(sample_img,
+                                      torch.mean(outputs['x_mean'], dim=1),
+                                      torch.mean(outputs['x_log_var'], dim=1))
         kl_x = -0.5 * torch.sum(1 + outputs['log_var'] - outputs['mu']**2 - torch.exp(outputs['log_var']), dim=1)
         kl_x = torch.sum(kl_x,dim=1) # sum over the features
-        if aux_variables > 0:
-            kl_a = kl_a_calc(outputs["q_a"],outputs["q_a_mu"],outputs["q_a_log_var"],torch.mean(outputs["p_a_mu"],dim = 1),torch.mean(outputs["p_a_log_var"],dim = 1))
+        if params["aux_variables"] > 0:
+            kl_a = kl_a_calc(outputs["q_a"], outputs["q_a_mu"], outputs["q_a_log_var"],
+                             torch.mean(outputs["p_a_mu"], dim=1), torch.mean(outputs["p_a_log_var"], dim=1))
             kl = w1 * torch.mean(kl_x) + (1 - w1) * torch.mean(kl_a)
         else:
             kl_a = torch.Tensor([0])
@@ -169,6 +176,8 @@ def balanced_binary_cross_entropy( logits, y_hot):
     classWeight = torch.FloatTensor([torch.sum(y_hot[:,1,0])/torch.sum(y_hot[:,1,]), torch.sum(y_hot[:,1,1])/torch.sum(y_hot[:,1,])]).cuda(device=0)
     class_loss_0 = 0
     class_loss_1 = 0
+
+    batch_size = logits.shape[0]
     
     for i in range(0, batch_size):
         tmp = torch.mean(y_hot, dim = 1)[i][0] 
