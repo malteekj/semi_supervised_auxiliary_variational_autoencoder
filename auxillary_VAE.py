@@ -592,49 +592,51 @@ for epoch in range(num_epochs):
     
     showImageGrid(axarr[4, 0], 'latent features', normalize(displaying_latent_features.reshape(-1, img_dimension[0], img_dimension[1])), rows, columns)
 
-    
     plt.show()
     plt.savefig(tmp_img)
     plt.close(f)
     os.remove(tmp_img)
-    
-    
+
     # find performance on validation set.
     if epoch % 5:
         continue
-    
+
     # Run trough full test data set
     TP, FP, FN, TN, P, N = 0, 0, 0, 0, 0, 0
     for (x, y) in testloader:
-        y_hot =  torch.zeros([batch_size,2])
+        # y_hot = torch.zeros([batch_size, 2])
+        # for i in range(len(y)):
+        #    y_hot[i] = torch.tensor([0, 1]) if y[i]==1 else torch.tensor([1, 0])
+        # One-hot encoding with function instead of for loop
+        y_hot = torch.nn.functional.one_hot(y.to(torch.int64))
 
-        for i in range(len(y)):
-            y_hot[i] = torch.tensor([0, 1]) if y[i]==1 else torch.tensor([1, 0])
-        x, y, y_hot = Variable(x), Variable(y), Variable(y_hot)
+        # The function 'Variable' is outdated
+        # x, y, y_hot = Variable(x), Variable(y), Variable(y_hot)
+
         if cuda:
-            # They need to be on the same device and be synchronized.
+            # They need to be on the same device and synchronized.
             x, y_hot = x.to(device), y_hot.to(device)
 
-        #### Labelled
-        outputs = net(x,y_hot)
+        # Labelled
+        outputs = net(x, y_hot)
         logits = outputs["y_hat"]
-        y_hot = y_hot.unsqueeze(dim = 1).repeat(1,logits.shape[1],1)
-        acc_1, TP_1, FP_1, FN_1, TN_1, P_1, N_1 = balanced_accuracy(logits, y_hot, return_all = True)
+        y_hot = y_hot.unsqueeze(dim=1).repeat(1, logits.shape[1], 1)
+        acc_1, TP_1, FP_1, FN_1, TN_1, P_1, N_1 = balanced_accuracy(logits, y_hot, return_all=True)
         TP += TP_1
         FP += FP_1
         FN += FN_1
         TN += TN_1
-        P  += P_1
-        N  += N_1
+        P += P_1
+        N += N_1
 
-    acc =  torch.sum(TP/P + TN/N)/2  
-    print("Acc: ",acc)    
-    print("TP: ",TP)
-    print("FP: ",FP)
-    print("TN: ",TN)
-    print("FN: ",FN)
-    print("P: ",P)
-    print("N: ",N)
+    acc = torch.sum(TP / P + TN / N) / 2
+    print("Acc: ", acc)
+    print("TP: ", TP)
+    print("FP: ", FP)
+    print("TN: ", TN)
+    print("FN: ", FN)
+    print("P: ", P)
+    print("N: ", N)
 
 #%%
 '''
