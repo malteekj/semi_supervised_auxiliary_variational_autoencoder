@@ -201,7 +201,7 @@ def balanced_binary_cross_entropy(logits, y_hot):
     """
     
     class_weight = torch.FloatTensor([torch.sum(y_hot[:, 1, 0])/torch.sum(y_hot[:, 1, ]),
-                                     torch.sum(y_hot[:, 1, 1])/torch.sum(y_hot[:, 1, ])]).cuda(device=0)
+                                     torch.sum(y_hot[:, 1, 1])/torch.sum(y_hot[:, 1, ])])
     class_loss_0 = 0
     class_loss_1 = 0
 
