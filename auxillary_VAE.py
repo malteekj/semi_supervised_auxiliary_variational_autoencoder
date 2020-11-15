@@ -30,17 +30,16 @@ from lossFunctions import Gaussian_density, kl_a_calc, ELBO_loss, normalize, bal
 '''
 ### Work log ###
 Pending tasks:
-    - Clean up parameter settings parsing for the network
     - clean up imports 
     - Check what loss functions are either needed or obsolete 
     
 Completed tasks:
+    - Clean up parameter settings parsing for the network
     - Give data loading it's own document
     - Give the network it's own document
     - Give the loss functions it's own document
 '''
 
-#%%
 #%% 
 '''
 Define the global parameters of the network.
@@ -423,10 +422,10 @@ for epoch in range(num_epochs):
     if epoch == 0:
         continue
     
-    if epoch % 10:
+    if epoch % 5:
         continue
     
-    validation_from = 20
+    validation_from = 5
     if epoch < validation_from:
         VALIDATION = False
     else:
@@ -638,7 +637,7 @@ for epoch in range(num_epochs):
 
     os.remove(tmp_img)
     
-    if epoch % 20:
+    if epoch % 5:
         continue
     
     # Run trough full test data set
@@ -674,6 +673,18 @@ for epoch in range(num_epochs):
     print("P: ",P)
     print("N: ",N)
 
+def showImageGrid(axes_object, title, images, rows, columns):
+    # Axes settings
+    axes_object.set_title(title)
+    axes_object.axis('off')
+    # Set canvas
+    
+    canvas = np.zeros((img_dimension[0]*rows, img_dimension[1]*columns))
+    for i in range(rows):
+        for j in range(columns):
+            idx = i % columns + rows * j
+            canvas[i*img_dimension[0]:(i+1)*img_dimension[0], j*img_dimension[1]:(j+1)*img_dimension[1]] = images[i,:,:]
+    axes_object.imshow(canvas, cmap='gray')
 #%%
 '''
 # Test Encoder
