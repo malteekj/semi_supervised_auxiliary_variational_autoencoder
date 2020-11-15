@@ -224,7 +224,20 @@ print('Class. loss: ', classification_loss)
 print('Likelihood:  ', likelihood_l)
 
 #%%
+def showImageGrid(axes_object, title, images, rows, columns):
+    # Axes settings
+    axes_object.set_title(title)
+    axes_object.axis('off')
+    # Set canvas
+    
+    canvas = np.zeros((img_dimension[0]*rows, img_dimension[1]*columns))
+    for i in range(rows):
+        for j in range(columns):
+            idx = i % columns + rows * j
+            canvas[i*img_dimension[0]:(i+1)*img_dimension[0], j*img_dimension[1]:(j+1)*img_dimension[1]] = images[idx,:,:]
+    axes_object.imshow(canvas, cmap='gray')
 
+#%% 
 # Deleting variable Image and reload package Image
 # get_ipython().run_line_magic('reset_selective', '-f "^Image$"')
 
@@ -433,7 +446,7 @@ for epoch in range(num_epochs):
     if epoch == 0:
         continue
     
-    if epoch % 5:
+    if epoch % 1:
         continue
     
     validation_from = 5
@@ -515,64 +528,32 @@ for epoch in range(num_epochs):
         ax.plot(np.arange(epoch+1), train_L, color="green")    # Typically L >>> H, therefore not L+H   
         ax.legend(['Train. ELBO Labelled', 'Train. ELBO Unlabelled'])
     
-    # Latent space samples
-    ax = axarr[1, 1]
-    ax.set_title('Samples from latent space')
-    ax.axis('off')
+   
+    showImageGrid(axarr[2, 0], 'Input images', x.reshape(-1, img_dimension[0], img_dimension[1]), rows, columns)
+
+    showImageGrid(axarr[2, 1], 'Reconstructions: mean', normalize(x_hat.reshape(-1, img_dimension[0], img_dimension[1])), rows, columns) 
 
     with torch.no_grad():
         epsilon = torch.randn(batch_size, latent_features).to(device)
         samples = torch.sigmoid(net.sample_from_latent(epsilon)).cpu().detach().numpy()
-    print(samples.shape)
+        latent_feature = torch.zeros(batch_size, latent_features).to(device)
+        for i in range(0, latent_features if latent_features <= batch_size else batch_size):
+            latent_feature[i, i] = 100
+        displaying_latent_features = (net.sample_from_latent(latent_feature)).cpu().detach() #no sigmoid, instead normalize later
+    
+    
+    showImageGrid(axarr[3, 1], 'Samples from latent space', samples.reshape(-1, img_dimension[0], img_dimension[1]), rows, columns)
+    
+    showImageGrid(axarr[3, 0], 'latent features', normalize(displaying_latent_features.reshape(-1, img_dimension[0], img_dimension[1])), rows, columns)
 
-    canvas = np.zeros((img_dimension[0]*rows, img_dimension[1]*columns))
-    for i in range(rows):
-        for j in range(columns):
-            idx = i % columns + rows * j
-            #temp_img = samples[idx].reshape((224, 224))
-            #canvas[i*28:(i+1)*28, j*28:(j+1)*28] = resize(temp_img, output_shape=[28,28], mode='reflect', anti_aliasing=True)
-            canvas[i*img_dimension[0]:(i+1)*img_dimension[0], j*img_dimension[1]:(j+1)*img_dimension[1]] = \
-                samples[idx,0:np.prod(img_dimension)].reshape(img_dimension)
-    ax.imshow(canvas, cmap='gray')
 
-    # Input images
-    ax = axarr[2, 0]
-    ax.set_title('Inputs')
-    ax.axis('off')
-
-    canvas = np.zeros((img_dimension[0]*rows, img_dimension[1]*columns))
-    for i in range(rows):
-        for j in range(columns):
-            idx = i % columns + rows * j
-            #temp_img = x[idx].reshape((224, 224))
-            #canvas[i*28:(i+1)*28, j*28:(j+1)*28] = resize(temp_img, output_shape=[28,28], mode='reflect', anti_aliasing=True)
-            canvas[i*img_dimension[0]:(i+1)*img_dimension[0], j*img_dimension[1]:(j+1)*img_dimension[1]] = \
-                x[idx,0:img_dimension[0]*img_dimension[1]].reshape(img_dimension)
-    ax.imshow(canvas, cmap='gray')
-
-    # Reconstructions
-    ax = axarr[2, 1]
-    ax.set_title('Reconstructions: mean')
-    ax.axis('off')
-
-    canvas = np.zeros((img_dimension[0]*rows, img_dimension[1]*columns))
-    for i in range(rows):
-        for j in range(columns):
-            idx = i % columns + rows * j
-            canvas[i*img_dimension[0]:(i+1)*img_dimension[0], j*img_dimension[1]:(j+1)*img_dimension[1]] = \
-                normalize(x_hat[idx,0:img_dimension[0]*img_dimension[1]].reshape(img_dimension))
-    ax.imshow(canvas, cmap='gray')
 
     # Latent features
     ax = axarr[3, 0]
     ax.axis('off')
     ax.set_title('Displaying latent features')
     with torch.no_grad():
-        latent_feature = torch.zeros(batch_size, latent_features).to(device)
-        for i in range(0, latent_features if latent_features <= batch_size else batch_size):
-            latent_feature[i, i] = 100
-        displaying_latent_features = (net.sample_from_latent(latent_feature)).cpu().detach() #no sigmoid, instead normalize later
-    
+        
     # Determine number of rows and columns based on the size of latent space
     if displaying_latent_features.shape[0] == 64: 
         rows_2 = 8
@@ -636,10 +617,9 @@ for epoch in range(num_epochs):
         # ax.plot(np.arange(epoch+1), train_latent_loss, color="green")
         ax.legend(['Train. kl_l_x',  'Train. kl_l_a'])
         # ax.legend(['Train. kl_l_x',  'Train. kl_l_a',  'Latent_loss'])
-    
+    plt.show()
     plt.savefig(tmp_img)
     plt.close(f)
-
     os.remove(tmp_img)
     
     if epoch % 5:
@@ -678,18 +658,6 @@ for epoch in range(num_epochs):
     print("P: ",P)
     print("N: ",N)
 
-def showImageGrid(axes_object, title, images, rows, columns):
-    # Axes settings
-    axes_object.set_title(title)
-    axes_object.axis('off')
-    # Set canvas
-    
-    canvas = np.zeros((img_dimension[0]*rows, img_dimension[1]*columns))
-    for i in range(rows):
-        for j in range(columns):
-            idx = i % columns + rows * j
-            canvas[i*img_dimension[0]:(i+1)*img_dimension[0], j*img_dimension[1]:(j+1)*img_dimension[1]] = images[i,:,:]
-    axes_object.imshow(canvas, cmap='gray')
 #%%
 '''
 # Test Encoder
