@@ -3,3 +3,4 @@ __pycache__/
 .ipynb_checkpoints/
 auxillary_VAE.ipynb
 conv_einsum_test.py
+vae_0.pth
