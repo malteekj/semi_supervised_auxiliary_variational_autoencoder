@@ -176,37 +176,38 @@ class CNN_VAE(nn.Module):
 
         return outputs
     
-    def map_to_latent_space(self,xa,y):
-        z = torch.cat([xa,y],dim=-1)
+    def map_to_latent_space(self, xa, y):
+        z = torch.cat([xa, y], dim=-1)
         if cuda:
             z = z.cuda()
         z = self.Additional_layer[0](z)
-        z = z.permute(0,2,1)
+        z = z.permute(0, 2, 1)
         z = self.Additional_layer[1](z)
-        z = z.permute(0,2,1)
+        z = z.permute(0, 2, 1)
         z = relu(z)
         if self.params['use_dropout']:
             z = dropout(z, p=self.params['do_p_lin']) 
         return z
-    
-    
-    def sample_y(self,batch_size,num_samples,num_classes,i):
-        tmp = Variable(torch.zeros(num_classes))
+
+    def sample_y(self, batch_size, num_samples, num_classes, i):
+        tmp = torch.zeros(num_classes)
         tmp[i] = 1
         tmp = tmp.cuda()
-        return tmp.repeat(batch_size,num_samples,1)
+        return tmp.repeat(batch_size, num_samples, 1)
     
     def sample_from_latent(self, x):
         x_UL = []
         for j in range(self.params['num_classes']):
-            tmp = self.decoder(x.unsqueeze(1).repeat(1,self.params['num_samples'],1), 
-                               self.sample_y(self.params['batch_size'], self.params['num_samples'], 
-                                             self.params['num_classes'], j))
+            tmp = self.decoder(x.unsqueeze(1).repeat(1, self.params['num_samples'], 1),
+                               self.sample_y(self.params['batch_size'],
+                                             self.params['num_samples'],
+                                             self.params['num_classes'],
+                                             j))
             x_UL.append(tmp)
         x_hat, _, _ = output_recon(sum(x_UL))
         return x_hat
     
-    def onehotEncode(self,num_classes,num_samples,batch_size):
+    def onehotEncode(self, num_classes, num_samples, batch_size):
         # Define labels as (0, ... , num_classes)
         labels = torch.Tensor(range(num_classes)).type(torch.LongTensor)
         # Tile labels to get it repeatet tile wise
@@ -219,14 +220,14 @@ class CNN_VAE(nn.Module):
         y = y.unsqueeze(0).repeat(batch_size,1,1)
         return (y)
     
-    def run_module(self,module,x, y = None):
+    def run_module(self, module, x, y=None):
         #wrapper function for running a module either labeled or unlabeled
         
         if y is None: # If running unlabeled inputs
             y = self.onehotEncode(self.params['num_classes'], x.size(1), self.params['batch_size'])
             if cuda:
                 y = y.cuda()
-            x = x.repeat(1,self.params['num_classes'],1)
+            x = x.repeat(1, self.params['num_classes'], 1)
         else:
             y = y.unsqueeze(1).repeat(1,x.size(1),1)
         a = module(x,y)
@@ -352,15 +353,21 @@ class Decoder(nn.Module):
         self.layer_size = layer_size
         self.params = params
         
-        self.final_dim = compute_final_dimension(height=params['img_dimension'][0], 
-                            width=params['img_dimension'][1], last_num_channels=params['conv_out_channels'][-1], 
-                            conv_kernel=params['conv_kernel'], conv_padding=params['conv_padding'], 
-                            conv_stride=params['conv_stride'], pool_kernel=params['pool_kernel'], 
-                            pool_padding=params['pool_padding'], pool_stride=params['pool_stride'], num_conv=params['num_conv'])
+        self.final_dim = compute_final_dimension(height=params['img_dimension'][0],
+                                                 width=params['img_dimension'][1],
+                                                 last_num_channels=params['conv_out_channels'][-1],
+                                                 conv_kernel=params['conv_kernel'],
+                                                 conv_padding=params['conv_padding'],
+                                                 conv_stride=params['conv_stride'],
+                                                 pool_kernel=params['pool_kernel'],
+                                                 pool_padding=params['pool_padding'],
+                                                 pool_stride=params['pool_stride'],
+                                                 num_conv=params['num_conv'])
 
         # Initialize fully connected layers from latent space to convolutional layers
         Decoder_FC = nn.ModuleList()
-        Decoder_FC.append(Linear(in_features=params['latent_features']+params['num_classes'], out_features=params['lin_layer'][-1]))
+        Decoder_FC.append(Linear(in_features=params['latent_features'] + params['num_classes'],
+                                 out_features=params['lin_layer'][-1]))
         Decoder_FC.append(BatchNorm1d(params['lin_layer'][-1]))
         for i in reversed(range(params['num_lin'])):
             if i == 0:
@@ -369,7 +376,7 @@ class Decoder(nn.Module):
                 out_weights = params['lin_layer'][i-1]
             Decoder_FC.append(Linear(in_features=params['lin_layer'][i], out_features=out_weights))
             Decoder_FC.append(BatchNorm1d(out_weights))
-        self.add_module("Decoder_FC",Decoder_FC)
+        self.add_module("Decoder_FC", Decoder_FC)
         
         # Convolutional layers of the decoder
         Decoder_conv = nn.ModuleList()
@@ -385,9 +392,9 @@ class Decoder(nn.Module):
                                                 stride=params['conv_stride'][i],
                                                 padding=params['conv_padding'][i]))
             Decoder_conv.append(BatchNorm2d(output_channels))
-        self.add_module("Decoder_conv",Decoder_conv)
+        self.add_module("Decoder_conv", Decoder_conv)
     
-    def forward(self,z,y):
+    def forward(self, z, y):
         '''
         Inputs:
         z - variables from latent space [batch_size, num_samples, latent_features]
@@ -395,13 +402,13 @@ class Decoder(nn.Module):
         Outputs:
         x - reconstruction [batch_size, num_samples , channels*2, height, width]
         '''
-        x = torch.cat([z,y],dim=-1)
+        x = torch.cat([z, y], dim=-1)
         # Fully connected layers of decoder
-        for i in range(0,len(self.Decoder_FC),2):
+        for i in range(0, len(self.Decoder_FC), 2):
             x = self.Decoder_FC[i](x)
-            x = x.permute(0,2,1)
+            x = x.permute(0, 2, 1)
             x = self.Decoder_FC[i+1](x)
-            x = x.permute(0,2,1)
+            x = x.permute(0, 2, 1)
             x = relu(x)
             x = dropout(x, p=self.params['do_p_lin'])
         x = x.reshape(-1, self.Decoder_conv[0].in_channels, self.final_dim[1], self.final_dim[2])
